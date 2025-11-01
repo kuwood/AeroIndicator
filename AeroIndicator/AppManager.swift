@@ -4,6 +4,7 @@ class AppManager: ObservableObject {
     private var show = false
     private var window: MainWindow<AeroIndicatorApp>?
     private var server: Socket?
+    private var screenChangeObserver: NSObjectProtocol?
 
     @Published var workspaces: [String] = []
     @Published var focusWorkspace: String = ""
@@ -11,6 +12,13 @@ class AppManager: ObservableObject {
     @Published var config: AeroConfig = readConfig()
 
     var isUpdatingApps = false
+
+    deinit {
+        // Clean up the screen change observer
+        if let observer = screenChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
 
     func start() {
         Task {
@@ -25,6 +33,7 @@ class AppManager: ObservableObject {
                 self.allApps = allApps
 
                 self.createWindow()
+                self.observeScreenChanges()
             }
         }
         startListeningKey()
@@ -47,6 +56,43 @@ class AppManager: ObservableObject {
                 AeroIndicatorApp(model: self)
             }
 
+            self.window?.orderOut(nil)
+        }
+    }
+
+    private func observeScreenChanges() {
+        // Listen for screen parameter changes (resolution, display connect/disconnect, etc.)
+        screenChangeObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.recreateWindow()
+        }
+    }
+
+    private func recreateWindow() {
+        guard let screenFrame = NSScreen.main?.frame else { return }
+        let statusBarHeight = NSStatusBar.system.thickness
+        let contentRect = NSRect(
+            x: 0,
+            y: 0,
+            width: screenFrame.size.width,
+            height: screenFrame.size.height - statusBarHeight
+        )
+
+        // Preserve the current visibility state
+        let wasVisible = self.window?.isVisible ?? false
+
+        // Recreate the window with new screen dimensions
+        self.window = MainWindow(contentRect: contentRect) {
+            AeroIndicatorApp(model: self)
+        }
+
+        // Restore visibility state
+        if wasVisible {
+            self.window?.orderFrontRegardless()
+        } else {
             self.window?.orderOut(nil)
         }
     }
