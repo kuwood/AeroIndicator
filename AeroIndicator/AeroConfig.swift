@@ -37,9 +37,17 @@ func readConfig() -> AeroConfig {
     let fontSize = config?.doubleInt("font-size") ?? defaultConfig.fontSize
     let iconSize = config?.doubleInt("icon-size") ?? defaultConfig.iconSize
 
+    // Security: Validate source is one of the allowed values
+    let validSources = ["aerospace", "yabai"]
+    let validatedSource = validSources.contains(source) ? source : defaultConfig.source
+
+    // Security: Validate position is one of the allowed values
+    let validPositions = ["bottom-left", "bottom-center", "bottom-right", "top-left", "top-center", "top-right", "center"]
+    let validatedPosition = validPositions.contains(position) ? position : defaultConfig.position
+
     return AeroConfig(
-        source: source,
-        position: position,
+        source: validatedSource,
+        position: validatedPosition,
         outerPadding: outerPadding,
         innerPadding: innerPadding,
         borderRadius: borderRadius,

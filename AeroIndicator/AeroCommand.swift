@@ -1,6 +1,8 @@
 import AppKit
 import Foundation
 
+// Security: These commands are allowlisted and validated to prevent command injection
+// They contain no user input and use only read-only query operations
 private let aerospaceGetAllWorkspaceCommand = "aerospace list-workspaces --all"
 private let aerospaceGetFocusWorkspaceCommand = "aerospace list-workspaces --focused"
 private let aerospaceGetAllAppsCommand =
@@ -8,6 +10,16 @@ private let aerospaceGetAllAppsCommand =
 
 private let yabaiGetAllWorkspacesCommand = "yabai -m query --spaces"
 private let yabaiGetAllAppsCommand = "yabai -m query --windows"
+
+// Security: Allowlist of safe commands that can be executed
+// These are read-only queries with no user input
+private let allowedCommands: Set<String> = [
+    aerospaceGetAllWorkspaceCommand,
+    aerospaceGetFocusWorkspaceCommand,
+    aerospaceGetAllAppsCommand,
+    yabaiGetAllWorkspacesCommand,
+    yabaiGetAllAppsCommand
+]
 
 private func getBundleIdentifier(for pid: pid_t) -> String? {
     let runningApps = NSWorkspace.shared.runningApplications
@@ -45,9 +57,21 @@ struct YabaiApp: Codable {
 }
 
 private func runShellCommand(_ command: String, arguments: [String] = []) -> String {
+    // Security: Validate that the command is in our allowlist
+    guard allowedCommands.contains(command) else {
+        print("Error: Attempted to execute non-allowlisted command: \(command)")
+        return ""
+    }
+
+    // Security: Reject commands with additional arguments (defense in depth)
+    guard arguments.isEmpty else {
+        print("Error: Shell command arguments not supported for security reasons")
+        return ""
+    }
+
     let process = Process()
     process.launchPath = "/bin/sh"
-    process.arguments = ["-c", "export PATH=\"/opt/homebrew/bin:$PATH\" && \(command)"] + arguments
+    process.arguments = ["-c", "export PATH=\"/opt/homebrew/bin:$PATH\" && \(command)"]
 
     let pipe = Pipe()
     process.standardOutput = pipe
@@ -56,7 +80,8 @@ private func runShellCommand(_ command: String, arguments: [String] = []) -> Str
     do {
         try process.run()
     } catch {
-        fatalError("Failed to run process: \(error)")
+        print("Failed to run process: \(error)")
+        return ""
     }
 
     let data = pipe.fileHandleForReading.readDataToEndOfFile()

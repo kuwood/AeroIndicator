@@ -3,3 +3,7 @@ xcuserdata/
 **/CommandLine/aeroIndicator
 .zed/
 buildServer.json
+build/
+*.xcuserstate
+DerivedData/
+aerospace_config_snippet.toml

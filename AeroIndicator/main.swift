@@ -20,22 +20,28 @@ func runApplication() {
 }
 
 func stopApplication() {
+    // Security: Use bundle identifier for precise termination (safer than pkill -f)
     if let bundleID = Bundle.main.bundleIdentifier {
         let runningApps = NSRunningApplication.runningApplications(
             withBundleIdentifier: bundleID)
 
         for app in runningApps where app.processIdentifier != getpid() {
-            app.forceTerminate()
+            // Try graceful termination first
+            if !app.terminate() {
+                // Only force terminate if graceful fails
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    if app.isTerminated == false {
+                        app.forceTerminate()
+                    }
+                }
+            }
         }
     }
-    let processNames = ["aeroIndicator", "AeroIndicator", "AeroIndicator.app"]
-    for name in processNames {
-        let task = Process()
-        task.launchPath = "/usr/bin/pkill"
-        task.arguments = ["-f", name]
-        try? task.run()
-        task.waitUntilExit()
-    }
+
+    // Security: Removed broad pkill -f commands that could affect unrelated processes
+    // The bundle identifier approach above is safer and more precise
+
+    // Clean up socket file
     try? FileManager.default.removeItem(atPath: "/tmp/AeroIndicator")
 }
 

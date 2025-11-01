@@ -53,11 +53,33 @@ class AppManager: ObservableObject {
 
     private func startListeningCommand() {
         server = Socket(isClient: false) { message in
-            let splitMessages = message.split(separator: " ").map({ String($0) })
+            // Security: Validate and sanitize input
+            let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Reject messages that are too long (DOS protection)
+            guard trimmedMessage.count > 0 && trimmedMessage.count < 1000 else { return }
+
+            let splitMessages = trimmedMessage.split(separator: " ").map({ String($0) })
             guard splitMessages.count > 0 else { return }
+
+            // Security: Only allow specific commands (allowlist approach)
+            let validCommands = ["workspace-change", "focus-change", "workspace-created-or-destroyed"]
+            guard validCommands.contains(splitMessages[0]) else {
+                print("Warning: Rejected invalid command: \(splitMessages[0])")
+                return
+            }
+
             if splitMessages[0] == "workspace-change" && splitMessages.count == 2 {
+                // Security: Validate workspace name (alphanumeric and basic chars only)
+                let workspace = splitMessages[1]
+                let allowedCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_."))
+                guard workspace.rangeOfCharacter(from: allowedCharacters.inverted) == nil else {
+                    print("Warning: Rejected invalid workspace name: \(workspace)")
+                    return
+                }
+
                 withAnimation {
-                    self.focusWorkspace = splitMessages[1]
+                    self.focusWorkspace = workspace
                 }
             } else if splitMessages[0] == "focus-change" {
                 self.getAllWorkspaceApps()

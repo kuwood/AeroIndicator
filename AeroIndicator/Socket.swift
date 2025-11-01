@@ -57,6 +57,17 @@ class Socket {
                 fatalError("Bind failed: \(String(cString: strerror(errno)))")
             }
 
+            // Security: Set restrictive permissions on socket (owner read/write only)
+            // This prevents other users from sending commands to this app
+            do {
+                try FileManager.default.setAttributes(
+                    [.posixPermissions: 0o600],
+                    ofItemAtPath: socketPath
+                )
+            } catch {
+                print("Warning: Could not set socket permissions: \(error)")
+            }
+
             guard listen(fd, 5) != -1 else {
                 close(fd)
                 fatalError("Listen failed: \(String(cString: strerror(errno)))")
